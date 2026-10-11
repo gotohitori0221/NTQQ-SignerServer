@@ -1,4 +1,8 @@
 # NTQQ-SignerServer
+> [!TIP]
+> 出于某些原因 新版的签名无法开源 现提供公共签名服务器 可加入Q群983497968并使用群内的Bot获得使用权限
+> Signer Server Url https://sign-lagrange.goto-hitori.top/api/
+> 本sign版本为3.2.34-53644 所以请自己配置appinfo版本(Lagrange默认46494)如您不想配置 可以使用我Fork的Lagrnage.Milky[Lagrange.Core Fork](https://github.com/gotohitori0221/Lagrange.Core) 该版本已内置自动从签名服务器获取Appinfo版本 或者使用[EulerOnebot](https://github.com/HarcicYang/EulerOneBot)
 
 这是一个基于 ASP.NET Core 10 重写的 NTQQ 签名服务器
 
