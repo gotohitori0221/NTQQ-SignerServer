@@ -7,7 +7,7 @@ NTQQ 签名服务（纯本地实现），对应 Linux QQ `3.2.34-53644` 的 `sec
 ## 特性
 
 - 纯本地计算 `sec_sign` / `sec_token` / `sec_extra`，无外部依赖
-- 兼容 `Lagrange.Milky` / `Yogurt` / `EulerOneBot` 等 OneBot 实现的签名请求格式
+- 兼容 `Lagrange.Milky` / `Yogurt` / `EulerOneBot` 等 Milky/OneBot 实现的签名请求格式
 - 内置命令白名单（支持 `xxx.*` 后缀通配）与可选 Token 鉴权
 - 单文件、自包含发布（`win-x64` / `linux-x64`），可选 IL 混淆与 UPX 压缩
 - 自带一致性自检（`verify.bat`），对本仓库 `parity_reference.jsonl` 中的参考样本逐条比对
