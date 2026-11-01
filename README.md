@@ -1,195 +1,120 @@
-# NTQQ-SignerServer
-> [!TIP]
-> 出于某些原因 新版的签名无法开源 现提供公共签名服务器 可加入Q群983497968并使用群内的Bot获得使用权限
-> Signer Server Url https://sign-lagrange.goto-hitori.top/api/
-> 本sign版本为3.2.34-53644 所以请自己配置appinfo版本(Lagrange默认46494)如您不想配置 可以使用我Fork的Lagrnage.Milky[Lagrange.Core Fork](https://github.com/gotohitori0221/Lagrange.Core) 该版本已内置自动从签名服务器获取Appinfo版本 或者使用[EulerOnebot](https://github.com/HarcicYang/EulerOneBot)
+# NTQQ-PureSignServer
 
-这是一个基于 ASP.NET Core 10 重写的 NTQQ 签名服务器
+NTQQ 签名服务（纯本地实现），对应 Linux QQ `3.2.34-53644` 的 `sec-sign` 签名算法。
 
-## 项目结构
+本仓库的 `pure-53644` 分支为**独立实现版本**：不依赖 QQ 客户端进程、外部 DLL 或在线接口，签名逻辑全部在 C# 内部完成，启动即可使用。
 
+## 特性
+
+- 纯本地计算 `sec_sign` / `sec_token` / `sec_extra`，无外部依赖
+- 兼容 `Lagrange.Milky` / `Yogurt` / `EulerOneBot` 等 OneBot 实现的签名请求格式
+- 内置命令白名单（支持 `xxx.*` 后缀通配）与可选 Token 鉴权
+- 单文件、自包含发布（`win-x64` / `linux-x64`），可选 IL 混淆与 UPX 压缩
+- 自带一致性自检（`verify.bat`），对本仓库 `parity_reference.jsonl` 中的参考样本逐条比对
+
+## 目录结构
+
+| 文件 | 说明 |
+| --- | --- |
+| `Program.cs` | 全部服务端与签名实现 |
+| `appsettings.json` | 运行配置（监听地址、鉴权、命令白名单） |
+| `parity_reference.jsonl` | 自检参考样本（`body` / `us` / `sec_sign` / `sec_extra`） |
+| `build.bat` | 一键构建、混淆、打包 win-x64 与 linux-x64 单文件 |
+| `verify.bat` | 编译 `SELF` 自检版本并运行一致性测试 |
+| `obfuscar.xml` | Obfuscar 混淆配置 |
+| `upx.exe` | 可选的 UPX 压缩工具 |
+| `sign.js` | 签名算法的参考实现（JavaScript） |
+
+## 构建
+
+需要 .NET 10 / 9 / 8 SDK 任一（`build.bat` 会自动探测可用的目标框架）。
+
+```bat
+:: 仅编译 + 自检
+verify.bat
+
+:: 完整构建：Release -> 可选混淆 -> 单文件自包含发布
+build.bat
 ```
-NTQQ-SignServer/
-├── Controllers/           # API 控制器
-│   └── SignController.cs
-├── Models/               # 数据模型
-│   ├── SignRequest.cs
-│   └── AppSettings.cs
-├── Services/             # 业务服务
-│   ├── ISignService.cs
-│   ├── SignService.cs
-│   └── StartupService.cs
-├── Program.cs            # 程序入口
-├── appsettings.json      # 配置文件
-├── NTQQ-SignServer.csproj # 项目文件
-└── README.md            # 说明文档
+
+产物路径：
+
+- Windows：`bin\Release\<TFM>\win-x64\publish\NTQQ-PureSignServer.exe`
+- Linux：`bin\Release\<TFM>\linux-x64\publish\NTQQ-PureSignServer`
+
+## 运行
+
+```bat
+NTQQ-PureSignServer.exe                 :: 读取 appsettings.json
+NTQQ-PureSignServer.exe 8080            :: 覆盖端口
+NTQQ-PureSignServer.exe 8080 0.0.0.0    :: 覆盖端口 + 监听地址
 ```
 
-## 快速开始
+首次运行若缺少 `appsettings.json`，会自动生成默认配置文件。
 
-### 1. 安装依赖
-
-确保已安装 .NET 10 SDK：
-cd到QQApp目录，运行gcc -std=c99 -shared -fPIC -o libsymbols.so symbols.c 生成so文件
-
-### 2. 配置签名服务
-
-编辑 `appsettings.json` 文件，配置签名服务参数：
+## 配置
 
 ```json
 {
-  "AppSettings": {
-    "SignService": {
-      "Host": "127.0.0.1",
-      "Port": 8080,
-      "Libs": ["libgnutls.so.30", "./libsymbols.so"],
-      "Offset": "0x0",
-      "MaxDataLength": 1048576,
-      "TimeoutMs": 5000
-    }
+  "Server": { "Host": "127.0.0.1", "Port": 8080 },
+  "Auth": {
+    "EnableTokenAuth": false,
+    "Tokens": [ "your_token_here" ]
+  },
+  "Whitelist": {
+    "EnableCmdWhitelist": true,
+    "CmdWhitelist": [ "ConnAuthSvr.fast_qq_login", "trpc.*" ]
   }
 }
 ```
 
-### 3. 运行服务器
+- `Server.Host` / `Server.Port`：监听地址与端口，默认 `127.0.0.1:8080`
+- `Auth.EnableTokenAuth`：开启后请求需带 `Authorization: Bearer <token>` 或 `?token=<token>`
+- `Whitelist.EnableCmdWhitelist`：开启后仅放行 `CmdWhitelist` 中的命令，以 `*` 结尾表示前缀匹配
 
-```bash
-# 进入项目目录
-cd NTQQ-SignServer
+## 接口
 
-# 恢复 NuGet 包
-dotnet restore
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET / POST | `/api/sign/sec-sign/appinfo_v2` | 返回 `appinfo_v2`（供客户端获取签名配置） |
+| GET / POST | `/api/sign/sec-sign` | 主签名接口 |
+| GET / POST | `/sign` | 同上，兼容旧路径 |
 
-# 运行服务器
-dotnet run
-```
+请求参数（GET 走 Query，POST 走 JSON Body 或 Query）：
 
-服务器将在 `http://localhost:8080` 启动。
-
-## API 接口
-
-### 签名接口
-
-**POST** `/api/sign`
-
-请求体：
-```json
-{
-  "cmd": "wtlogin.login",
-  "src": "0102030405060708",
-  "seq": 1
-}
-```
+| 字段 | 说明 |
+| --- | --- |
+| `cmd` / `command` | 命令名，用于白名单校验 |
+| `uin` | QQ 号，仅用于日志 |
+| `body` / `src` | 待签名数据的十六进制串 |
+| `qua` / `ver` | 客户端 QUA，缺省使用内置值 |
 
 响应：
+
 ```json
 {
+  "code": 0,
+  "message": null,
   "value": {
-    "token": "A1B2C3D4E5F6...",
-    "extra": "G7H8I9J0K1L2...",
-    "sign": "M3N4O5P6Q7R8..."
+    "sec_sign": "...",
+    "sec_token": "...",
+    "sec_extra": "..."
   }
 }
 ```
 
-### 应用信息接口
+OneBot 端签名地址填写 `http://127.0.0.1:8080/api/`。
 
-**GET** `/api/sign/appinfo`
+## 自检
 
-返回从appinfo.json读取的应用配置信息。
-
-**GET** `/api/sign/appinfo_v2`
-
-返回从appinfo.json读取的应用配置信息，并转译为Lagrange v2格式。
-
-### 健康检查
-
-**GET** `/api/sign/health`
-
-返回服务器健康状态。
-
-**GET** `/api/sign/status`
-
-返回签名服务状态。
-
-## 配置说明
-
-### SignService 配置
-
-| 配置项 | 类型 | 默认值 | 说明 |
-|--------|------|--------|------|
-| Host | string | 127.0.0.1 | 服务器监听地址 |
-| Port | int | 8080 | 服务器监听端口 |
-| Libs | string[] | ["libgnutls.so.30", "./libsymbols.so"] | 依赖库列表 |
-| Offset | string | "0x0" | 签名函数偏移量 |
-| MaxDataLength | int | 1048576 | 最大数据长度（1MB） |
-| TimeoutMs | int | 5000 | 超时时间（毫秒） |
-
-### 日志配置
-
-日志级别可以在 `appsettings.json` 中配置：
-
-```json
-{
-  "Logging": {
-    "LogLevel": {
-      "Default": "Information",
-      "Microsoft.AspNetCore": "Warning",
-      "NTQQ_SignServer": "Information"
-    }
-  }
-}
+```bat
+verify.bat
 ```
 
-
-## 故障排除
-
-### 常见问题
-
-1. **端口被占用**
-   ```bash
-   # 查找占用端口的进程
-   netstat -tulpn | grep 8080
-   
-   # 或者修改 appsettings.json 中的端口号
-   ```
-
-2. **依赖库加载失败**
-   - 确保 `libgnutls.so.30` 和 `libsymbols.so` 在系统路径中
-   - 或者修改 Libs 配置为正确的库路径
-
-3. **签名函数偏移量错误**
-   - 检查 Offset 配置是否正确
-   - 确保 wrapper.node 文件存在且版本匹配
-
-### 日志查看
-
-服务器启动时会输出详细的日志信息，可以通过以下方式查看：
-
-```bash
-# 查看控制台输出
-dotnet run
-
-# 或者查看系统日志
-journalctl -u ntqq-signserver
-```
-
-## 开发说明
-
-### 添加新的 API 接口
-
-1. 在 `Controllers/` 目录下创建新的控制器
-2. 在 `Models/` 目录下定义请求/响应模型
-3. 在 `Services/` 目录下实现业务逻辑
-
-### 修改配置
-
-所有配置都在 `appsettings.json` 中管理，支持开发和生产环境的不同配置。
+编译带 `SELF` 宏的版本，并以 `parity_reference.jsonl` 中的参考结果逐条比对，输出 `OK=... BAD=...`。
 
 ## 许可证
 
-本项目基于 AGPL-3.0 许可证开源。
+本分支保留仓库根目录的 `LICENSE`，版权与使用条款以该文件为准。
 
-## 贡献
-
-欢迎提交 Issue 和 Pull Request 来改进这个项目。
+> 本项目仅用于学习、研究与个人协议端开发交流，请勿用于任何违反法律法规或平台服务条款的场景。
